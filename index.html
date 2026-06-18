@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tính Điểm & Dự Đoán GPA</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 Chế độ tối</button>
+
+    <h2>📊 Công Cụ Tính Điểm & Dự Đoán GPA</h2>
+    <div class="subtitle">
+        Gọn gàng - Nhanh chóng.<br>
+        Tỷ lệ % (mờ bên dưới) có thể tùy chỉnh cho từng cột.
+    </div>
+
+    <div class="table-responsive">
+        <table id="subjectTable">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">Mã MH</th>
+                    <th style="width: 20%; text-align: left; padding-left: 8px;">Tên MH</th>
+                    <th style="width: 6%;">TC</th>
+                    <th style="width: 9%;">QT</th>
+                    <th style="width: 9%;">TH</th>
+                    <th style="width: 9%;">GK</th>
+                    <th style="width: 9%;">CK</th>
+                    <th style="width: 9%;">Điểm HP</th>
+                    <th style="width: 11%;">Điểm KV</th>
+                    <th style="width: 8%;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="text" class="sub-code" placeholder="VD: IT001" value="IT001"></td>
+                    <td><input type="text" class="sub-name" value="Nhập môn lập trình"></td>
+                    <td><input type="number" class="sub-credits" min="1" value="3"></td>
+                    <td>
+                        <div class="grade-cell">
+                            <input type="text" class="sub-grade sub-qt" value="8.0">
+                            <div class="weight-input-wrapper"><input type="number" class="w-qt" value="10" min="0" max="100">%</div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="grade-cell">
+                            <input type="text" class="sub-grade sub-th" value="8.5">
+                            <div class="weight-input-wrapper"><input type="number" class="w-th" value="20" min="0" max="100">%</div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="grade-cell">
+                            <input type="text" class="sub-grade sub-gk" value="7.0">
+                            <div class="weight-input-wrapper"><input type="number" class="w-gk" value="30" min="0" max="100">%</div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="grade-cell">
+                            <input type="text" class="sub-grade sub-ck" placeholder="Trống">
+                            <div class="weight-input-wrapper"><input type="number" class="w-ck" value="40" min="0" max="100">%</div>
+                        </div>
+                    </td>
+                    <td class="final-grade">-</td>
+                    <td><input type="number" class="sub-expected" min="0" max="10" step="0.1" placeholder="Mục tiêu" value=""></td>
+                    <td><button class="btn btn-delete" onclick="deleteRow(this)">Xóa</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <button class="btn btn-add" onclick="addRow()">➕ Thêm môn mới</button>
+    <button class="btn btn-calc" onclick="calculateTotalGPA()">🧮 Tính toán tổng GPA</button>
+
+    <div class="result-box" id="resultBox">
+        <h3 style="margin-top: 0; color: var(--result-text);">Kết quả học tập tổng kết:</h3>
+        <div class="result-grid">
+            <div class="result-item"><div>Tổng số tín chỉ</div><div class="result-value" id="resTotalCredits">0</div></div>
+            <div class="result-item"><div>GPA (Hệ 10)</div><div class="result-value" id="resGpa10">0.0</div></div>
+            <div class="result-item"><div>GPA (Hệ 4)</div><div class="result-value" id="resGpa4">0.0</div></div>
+            <div class="result-item"><div>Xếp loại</div><div class="result-value" id="resRank" style="color: var(--primary-color);">-</div></div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
