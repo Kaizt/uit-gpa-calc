@@ -1,20 +1,23 @@
-// --- CÁC HÀM TOÀN CỤC & XỬ LÝ GIAO DIỆN ---
+// ==========================================
+// 1. CÁC HÀM TOÀN CỤC & XỬ LÝ GIAO DIỆN
+// ==========================================
 
+// Hàm chuyển đổi chế độ Sáng / Tối
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute("data-theme");
     const btn = document.getElementById("themeBtn");
     if (currentTheme === "dark") {
         document.documentElement.removeAttribute("data-theme");
         btn.innerHTML = "🌙 Chế độ tối";
-        localStorage.setItem("gpaTheme", "light"); // Lưu lựa chọn sáng
+        localStorage.setItem("uit_gpa_theme_store", "light"); // Lưu trạng thái sáng
     } else {
         document.documentElement.setAttribute("data-theme", "dark");
         btn.innerHTML = "☀️ Chế độ sáng";
-        localStorage.setItem("gpaTheme", "dark"); // Lưu lựa chọn tối
+        localStorage.setItem("uit_gpa_theme_store", "dark"); // Lưu trạng thái tối
     }
 }
 
-// Hàm gom mã HTML của 1 dòng để tái sử dụng khi Add Row hoặc Load Data
+// Hàm tạo cấu trúc HTML cho một dòng môn học
 function createRowHTML(data = {}) {
     const code = data.code || "";
     const name = data.name || "";
@@ -63,26 +66,32 @@ function createRowHTML(data = {}) {
     `;
 }
 
+// Hàm thêm dòng mới
 function addRow() {
     const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
     const newRow = table.insertRow();
     newRow.innerHTML = createRowHTML();
     calculateSingleRow(newRow);
-    saveData(); // Lưu ngay khi thêm môn mới
+    saveData(); // Tự động lưu lại trạng thái bảng mới
 }
 
+// Hàm xóa dòng
 function deleteRow(button) {
     const tbody = button.closest('tbody');
     if (tbody.rows.length > 1) {
         tbody.removeChild(button.closest('tr'));
-        saveData(); // Lưu ngay khi xóa môn
+        saveData(); // Tự động lưu sau khi xóa
     } else {
         alert("Phải giữ lại ít nhất một môn học!");
     }
 }
 
-// --- LOGIC TÍNH TOÁN ---
 
+// ==========================================
+// 2. LOGIC TÍNH TOÁN ĐIỂM SỐ
+// ==========================================
+
+// Quy đổi điểm hệ 10 sang hệ 4 theo quy chế UIT
 function convertToHệ4(grade10) {
     if (grade10 >= 8.5) return 4.0;
     if (grade10 >= 8.0) return 3.5;
@@ -94,6 +103,7 @@ function convertToHệ4(grade10) {
     return 0.0;
 }
 
+// Xếp loại học lực dựa trên GPA hệ 4
 function getRank(gpa4) {
     if (gpa4 >= 3.6) return "Xuất sắc";
     if (gpa4 >= 3.2) return "Giỏi";
@@ -102,6 +112,7 @@ function getRank(gpa4) {
     return "Yếu/Kém";
 }
 
+// Tính toán thời gian thực cho duy nhất 1 hàng môn học
 function calculateSingleRow(row) {
     let w_qt_el = row.querySelector(".w-qt");
     let w_th_el = row.querySelector(".w-th");
@@ -118,6 +129,7 @@ function calculateSingleRow(row) {
     const avgCell = row.querySelector(".final-grade");
     const totalWeight = w_qt + w_th + w_gk + w_ck;
     
+    // Kiểm tra xem tổng tỉ lệ phần trăm có bằng 100% không
     if (Math.abs(totalWeight - 1) > 0.001) {
         if (avgCell) {
             avgCell.innerText = "Sai %";
@@ -134,6 +146,7 @@ function calculateSingleRow(row) {
     const inputCk = row.querySelector(".sub-ck");
     const expectedInput = row.querySelector(".sub-expected");
 
+    // Clear các ô tự động tính toán từ lần trước để tránh sai số
     [inputQt, inputTh, inputGk, inputCk].forEach(input => {
         if (input && input.classList.contains("auto-calculated")) {
             input.value = "";
@@ -147,6 +160,7 @@ function calculateSingleRow(row) {
     let ck = inputCk.value.trim() === "" ? null : parseFloat(inputCk.value);
     let expected = expectedInput.value.trim() === "" ? null : parseFloat(expectedInput.value);
 
+    // Tính toán điểm kỳ vọng gánh kèo cho các cột trống
     if (expected !== null && !isNaN(expected)) {
         let currentPoints = 0;
         let missingWeight = 0;
@@ -164,7 +178,7 @@ function calculateSingleRow(row) {
             missingInputs.forEach(input => {
                 input.value = requiredScore.toFixed(1);
                 input.classList.add("auto-calculated");
-                if (requiredScore > 10) input.classList.add("over-limit");
+                if (requiredScore > 10) input.classList.add("over-limit"); // Tô đỏ nếu bất khả thi
                 else input.classList.remove("over-limit");
             });
 
@@ -186,6 +200,7 @@ function calculateSingleRow(row) {
     }
 }
 
+// Tính tổng học kỳ khi bấm nút "Tính toán tổng GPA"
 function calculateTotalGPA() {
     document.querySelectorAll("#subjectTable tbody tr").forEach(row => calculateSingleRow(row));
 
@@ -244,9 +259,12 @@ function calculateTotalGPA() {
     document.getElementById("resultBox").style.display = "block";
 }
 
-// --- QUẢN LÝ LƯU TRỮ LOCAL STORAGE ---
 
-// Hàm quét toàn bộ bảng và nén thành JSON lưu vào trình duyệt
+// ==========================================
+// 3. QUẢN LÝ LƯU TRỮ LOCAL STORAGE (ĐÃ FIX LỖI PATH)
+// ==========================================
+
+// Hàm lưu ngầm toàn bộ dữ liệu bảng vào trình duyệt (Đổi tên Key độc quyền)
 function saveData() {
     const rows = document.querySelectorAll("#subjectTable tbody tr");
     const data = [];
@@ -266,62 +284,68 @@ function saveData() {
             w_ck: row.querySelector(".w-ck").value
         });
     });
-    localStorage.setItem("gpaData", JSON.stringify(data));
+    // Sử dụng Key độc quyền để không bị lỗi phân tách folder của GitHub Pages
+    localStorage.setItem("uit_gpa_data_store", JSON.stringify(data));
 }
 
-// Hàm lấy dữ liệu từ trình duyệt ra đắp lại lên web khi mới vào
+// Hàm tải dữ liệu cũ lên lại giao diện khi load trang
 function loadData() {
-    // Phục hồi Chế độ Tối/Sáng
-    if (localStorage.getItem("gpaTheme") === "dark") {
+    // Phục hồi giao diện sáng/tối
+    if (localStorage.getItem("uit_gpa_theme_store") === "dark") {
         document.documentElement.setAttribute("data-theme", "dark");
         document.getElementById("themeBtn").innerHTML = "☀️ Chế độ sáng";
     }
 
-    // Phục hồi Bảng điểm
-    const savedData = localStorage.getItem("gpaData");
+    // Phục hồi dữ liệu bảng điểm
+    const savedData = localStorage.getItem("uit_gpa_data_store");
     if (savedData) {
         try {
             const data = JSON.parse(savedData);
             const tbody = document.querySelector("#subjectTable tbody");
             if (data && data.length > 0) {
-                tbody.innerHTML = ""; // Xóa dữ liệu cứng trong file HTML
+                tbody.innerHTML = ""; // Clear hàng mẫu mặc định trong HTML
                 data.forEach(item => {
                     const newRow = tbody.insertRow();
                     newRow.innerHTML = createRowHTML(item);
-                    calculateSingleRow(newRow); // Tính toán lại môn đó ngay lúc load
+                    calculateSingleRow(newRow); // Chạy hàm tính toán luôn cho môn đó
                 });
             }
         } catch (e) {
-            console.error("Lỗi khi phục hồi dữ liệu:", e);
+            console.error("Lỗi phục hồi dữ liệu bảng:", e);
         }
     } else {
-        // Nếu là lần đầu tiên truy cập (chưa có data), chạy tính toán cho các dòng mẫu có sẵn trong HTML
+        // Nếu là lần đầu tiên mở web (chưa có data lưu trữ), tính toán hàng mẫu mặc định
         document.querySelectorAll("#subjectTable tbody tr").forEach(row => calculateSingleRow(row));
     }
 }
 
-// --- LẮNG NGHE SỰ KIỆN KHỞI ĐỘNG ---
+
+// ==========================================
+// 4. KHỞI ĐỘNG VÀ LẮNG NGHE SỰ KIỆN
+// ==========================================
 
 document.addEventListener("DOMContentLoaded", function() {
-    loadData(); // Tải dữ liệu ngay khi mở tab
+    loadData(); // Gọi hàm lôi dữ liệu cũ lên ngay khi vừa dựng DOM xong
 
     const table = document.getElementById('subjectTable');
     if (table) {
+        // Lắng nghe sự kiện người dùng nhập dữ liệu liên tục (Real-time)
         table.addEventListener('input', function(event) {
             if (event.target.tagName === "INPUT") {
                 const row = event.target.closest('tr');
                 if (row) calculateSingleRow(row);
-                saveData(); // Cứ gõ phím đổi điểm là lưu ngầm liền
+                saveData(); // Gõ tới đâu lưu ngầm tới đó
             }
         });
     }
 
+    // Lắng nghe phím Enter chỉ cập nhật riêng dòng môn học đó
     document.addEventListener("keydown", function(event) {
         if (event.key === "Enter" && event.target.tagName === "INPUT") {
-            event.preventDefault();
+            event.preventDefault(); 
             const row = event.target.closest('tr');
             if (row) calculateSingleRow(row);
-            saveData(); // Gõ Enter cũng lưu ngầm liền
+            saveData(); // Lưu lại dữ liệu sau khi bấm Enter
         }
     });
 });
