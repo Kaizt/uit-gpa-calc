@@ -1,4 +1,4 @@
-// --- CÁC HÀM TOÀN CỤC (GLOBAL SCOPE) ĐỂ ĐÁP ỨNG EVENT ONCLICK TRÊN HTML ---
+// --- CÁC HÀM TOÀN CỤC & XỬ LÝ GIAO DIỆN ---
 
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute("data-theme");
@@ -6,58 +6,82 @@ function toggleTheme() {
     if (currentTheme === "dark") {
         document.documentElement.removeAttribute("data-theme");
         btn.innerHTML = "🌙 Chế độ tối";
+        localStorage.setItem("gpaTheme", "light"); // Lưu lựa chọn sáng
     } else {
         document.documentElement.setAttribute("data-theme", "dark");
         btn.innerHTML = "☀️ Chế độ sáng";
+        localStorage.setItem("gpaTheme", "dark"); // Lưu lựa chọn tối
     }
+}
+
+// Hàm gom mã HTML của 1 dòng để tái sử dụng khi Add Row hoặc Load Data
+function createRowHTML(data = {}) {
+    const code = data.code || "";
+    const name = data.name || "";
+    const credits = data.credits || "3";
+    const qt = data.qt || "";
+    const th = data.th || "";
+    const gk = data.gk || "";
+    const ck = data.ck || "";
+    const expected = data.expected || "";
+    const w_qt = data.w_qt !== undefined ? data.w_qt : "10";
+    const w_th = data.w_th !== undefined ? data.w_th : "20";
+    const w_gk = data.w_gk !== undefined ? data.w_gk : "30";
+    const w_ck = data.w_ck !== undefined ? data.w_ck : "40";
+
+    return `
+        <td><input type="text" class="sub-code" placeholder="Mã MH" value="${code}"></td>
+        <td><input type="text" class="sub-name" placeholder="Tên môn học" value="${name}"></td>
+        <td><input type="number" class="sub-credits" min="1" value="${credits}"></td>
+        <td>
+            <div class="grade-cell">
+                <input type="text" class="sub-grade sub-qt" placeholder="Trống" value="${qt}">
+                <div class="weight-input-wrapper"><input type="number" class="w-qt" value="${w_qt}" min="0" max="100">%</div>
+            </div>
+        </td>
+        <td>
+            <div class="grade-cell">
+                <input type="text" class="sub-grade sub-th" placeholder="Trống" value="${th}">
+                <div class="weight-input-wrapper"><input type="number" class="w-th" value="${w_th}" min="0" max="100">%</div>
+            </div>
+        </td>
+        <td>
+            <div class="grade-cell">
+                <input type="text" class="sub-grade sub-gk" placeholder="Trống" value="${gk}">
+                <div class="weight-input-wrapper"><input type="number" class="w-gk" value="${w_gk}" min="0" max="100">%</div>
+            </div>
+        </td>
+        <td>
+            <div class="grade-cell">
+                <input type="text" class="sub-grade sub-ck" placeholder="Trống" value="${ck}">
+                <div class="weight-input-wrapper"><input type="number" class="w-ck" value="${w_ck}" min="0" max="100">%</div>
+            </div>
+        </td>
+        <td class="final-grade">-</td>
+        <td><input type="number" class="sub-expected" min="0" max="10" step="0.1" placeholder="Mục tiêu" value="${expected}"></td>
+        <td><button class="btn btn-delete" onclick="deleteRow(this)">Xóa</button></td>
+    `;
 }
 
 function addRow() {
     const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
     const newRow = table.insertRow();
-    newRow.innerHTML = `
-        <td><input type="text" class="sub-code" placeholder="Mã MH"></td>
-        <td><input type="text" class="sub-name" placeholder="Tên môn học"></td>
-        <td><input type="number" class="sub-credits" min="1" value="3"></td>
-        <td>
-            <div class="grade-cell">
-                <input type="text" class="sub-grade sub-qt" placeholder="Trống">
-                <div class="weight-input-wrapper"><input type="number" class="w-qt" value="10" min="0" max="100">%</div>
-            </div>
-        </td>
-        <td>
-            <div class="grade-cell">
-                <input type="text" class="sub-grade sub-th" placeholder="Trống">
-                <div class="weight-input-wrapper"><input type="number" class="w-th" value="20" min="0" max="100">%</div>
-            </div>
-        </td>
-        <td>
-            <div class="grade-cell">
-                <input type="text" class="sub-grade sub-gk" placeholder="Trống">
-                <div class="weight-input-wrapper"><input type="number" class="w-gk" value="30" min="0" max="100">%</div>
-            </div>
-        </td>
-        <td>
-            <div class="grade-cell">
-                <input type="text" class="sub-grade sub-ck" placeholder="Trống">
-                <div class="weight-input-wrapper"><input type="number" class="w-ck" value="40" min="0" max="100">%</div>
-            </div>
-        </td>
-        <td class="final-grade">-</td>
-        <td><input type="number" class="sub-expected" min="0" max="10" step="0.1" placeholder="Mục tiêu" value=""></td>
-        <td><button class="btn btn-delete" onclick="deleteRow(this)">Xóa</button></td>
-    `;
+    newRow.innerHTML = createRowHTML();
     calculateSingleRow(newRow);
+    saveData(); // Lưu ngay khi thêm môn mới
 }
 
 function deleteRow(button) {
     const tbody = button.closest('tbody');
     if (tbody.rows.length > 1) {
         tbody.removeChild(button.closest('tr'));
+        saveData(); // Lưu ngay khi xóa môn
     } else {
         alert("Phải giữ lại ít nhất một môn học!");
     }
 }
+
+// --- LOGIC TÍNH TOÁN ---
 
 function convertToHệ4(grade10) {
     if (grade10 >= 8.5) return 4.0;
@@ -78,7 +102,6 @@ function getRank(gpa4) {
     return "Yếu/Kém";
 }
 
-// Hàm tính toán riêng lẻ cho từng dòng môn học
 function calculateSingleRow(row) {
     let w_qt_el = row.querySelector(".w-qt");
     let w_th_el = row.querySelector(".w-th");
@@ -163,7 +186,6 @@ function calculateSingleRow(row) {
     }
 }
 
-// Hàm tính toán tổng hợp toàn bộ bảng điểm GPA học kỳ
 function calculateTotalGPA() {
     document.querySelectorAll("#subjectTable tbody tr").forEach(row => calculateSingleRow(row));
 
@@ -222,29 +244,84 @@ function calculateTotalGPA() {
     document.getElementById("resultBox").style.display = "block";
 }
 
-// --- KHỐI LẮNG NGHE SỰ KIỆN KHI DOM SẴN SÀNG (ĐỂ FIX LỖI MẤT TÍNH NĂNG) ---
+// --- QUẢN LÝ LƯU TRỮ LOCAL STORAGE ---
+
+// Hàm quét toàn bộ bảng và nén thành JSON lưu vào trình duyệt
+function saveData() {
+    const rows = document.querySelectorAll("#subjectTable tbody tr");
+    const data = [];
+    rows.forEach(row => {
+        data.push({
+            code: row.querySelector(".sub-code").value,
+            name: row.querySelector(".sub-name").value,
+            credits: row.querySelector(".sub-credits").value,
+            qt: row.querySelector(".sub-qt").value,
+            th: row.querySelector(".sub-th").value,
+            gk: row.querySelector(".sub-gk").value,
+            ck: row.querySelector(".sub-ck").value,
+            expected: row.querySelector(".sub-expected").value,
+            w_qt: row.querySelector(".w-qt").value,
+            w_th: row.querySelector(".w-th").value,
+            w_gk: row.querySelector(".w-gk").value,
+            w_ck: row.querySelector(".w-ck").value
+        });
+    });
+    localStorage.setItem("gpaData", JSON.stringify(data));
+}
+
+// Hàm lấy dữ liệu từ trình duyệt ra đắp lại lên web khi mới vào
+function loadData() {
+    // Phục hồi Chế độ Tối/Sáng
+    if (localStorage.getItem("gpaTheme") === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+        document.getElementById("themeBtn").innerHTML = "☀️ Chế độ sáng";
+    }
+
+    // Phục hồi Bảng điểm
+    const savedData = localStorage.getItem("gpaData");
+    if (savedData) {
+        try {
+            const data = JSON.parse(savedData);
+            const tbody = document.querySelector("#subjectTable tbody");
+            if (data && data.length > 0) {
+                tbody.innerHTML = ""; // Xóa dữ liệu cứng trong file HTML
+                data.forEach(item => {
+                    const newRow = tbody.insertRow();
+                    newRow.innerHTML = createRowHTML(item);
+                    calculateSingleRow(newRow); // Tính toán lại môn đó ngay lúc load
+                });
+            }
+        } catch (e) {
+            console.error("Lỗi khi phục hồi dữ liệu:", e);
+        }
+    } else {
+        // Nếu là lần đầu tiên truy cập (chưa có data), chạy tính toán cho các dòng mẫu có sẵn trong HTML
+        document.querySelectorAll("#subjectTable tbody tr").forEach(row => calculateSingleRow(row));
+    }
+}
+
+// --- LẮNG NGHE SỰ KIỆN KHỞI ĐỘNG ---
 
 document.addEventListener("DOMContentLoaded", function() {
+    loadData(); // Tải dữ liệu ngay khi mở tab
+
     const table = document.getElementById('subjectTable');
     if (table) {
-        // 1. Tính năng cập nhật liên tục real-time khi gõ phím
         table.addEventListener('input', function(event) {
             if (event.target.tagName === "INPUT") {
                 const row = event.target.closest('tr');
                 if (row) calculateSingleRow(row);
+                saveData(); // Cứ gõ phím đổi điểm là lưu ngầm liền
             }
         });
     }
 
-    // 2. Tính năng bấm Enter chỉ cập nhật riêng dòng môn học đó
     document.addEventListener("keydown", function(event) {
         if (event.key === "Enter" && event.target.tagName === "INPUT") {
-            event.preventDefault(); // Ngăn trình duyệt reload hay làm hành động mặc định
+            event.preventDefault();
             const row = event.target.closest('tr');
             if (row) calculateSingleRow(row);
+            saveData(); // Gõ Enter cũng lưu ngầm liền
         }
     });
-
-    // 3. Tự động tính toán mẫu các dòng mặc định khi vừa mở web lên
-    document.querySelectorAll("#subjectTable tbody tr").forEach(row => calculateSingleRow(row));
 });

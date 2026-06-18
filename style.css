@@ -87,7 +87,6 @@ input.sub-name { text-align: left; }
 input.sub-expected { background-color: rgba(234, 179, 8, 0.1); border-color: #eab308; }
 [data-theme="dark"] input.sub-expected { background-color: rgba(234, 179, 8, 0.05); }
 
-/* Tối ưu ô nhập điểm và % gọn gàng nhất */
 .grade-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .weight-input-wrapper { display: flex; align-items: center; font-size: 11px; color: #9ca3af; }
 .weight-input-wrapper input {
@@ -105,7 +104,7 @@ input.over-limit { background-color: rgba(239, 68, 68, 0.15) !important; border-
 .btn-add { background-color: var(--primary-color); color: white; }
 .btn-add:hover { background-color: var(--primary-hover); }
 .btn-delete { background-color: #ef4444; color: white; padding: 4px 8px; font-size: 12px;}
-.btn-delete:hover { background-color: #dc2626; }
+.btn-delete:hover { border-color: #dc2626; }
 .btn-calc { background-color: #10b981; color: white; width: 100%; font-size: 16px; padding: 12px; margin-top: 10px; }
 .btn-calc:hover { background-color: #059669; }
 
