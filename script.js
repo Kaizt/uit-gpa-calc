@@ -1,23 +1,153 @@
 // ==========================================
-// 1. CÁC HÀM TOÀN CỤC & XỬ LÝ GIAO DIỆN
+// 1. QUẢN LÝ DROPDOWN & TÌM KIẾM
 // ==========================================
+function toggleMainMenu(event) {
+    event.stopPropagation(); 
+    const container = document.getElementById("presetDropdownContainer");
+    container.classList.toggle("show");
+    
+    if (container.classList.contains("show")) {
+        setTimeout(() => document.getElementById("subjectSearch").focus(), 50);
+    }
+}
 
-// Hàm chuyển đổi chế độ Sáng / Tối
+window.onclick = function(event) {
+    if (!event.target.closest('.dropdown')) {
+        const dropdown = document.getElementById("presetDropdownContainer");
+        if (dropdown && dropdown.classList.contains('show')) {
+            dropdown.classList.remove('show');
+        }
+    }
+}
+
+function filterSubjects() {
+    const query = document.getElementById("subjectSearch").value.toLowerCase();
+    const catList = document.getElementById("presetDropdownMenu");
+    const resList = document.getElementById("searchResults");
+
+    if (query.trim() === "") {
+        catList.style.display = "block";
+        resList.style.display = "none";
+        return;
+    }
+
+    catList.style.display = "none";
+    resList.style.display = "block";
+    resList.innerHTML = ""; 
+
+    let found = false;
+    PRESET_DATA.forEach(group => {
+        group.subjects.forEach(data => {
+            if (data.code.toLowerCase().includes(query) || data.name.toLowerCase().includes(query)) {
+                found = true;
+                const li = document.createElement("li");
+                const a = document.createElement("a");
+                a.className = "dropdown-item";
+                a.innerHTML = `<strong style="color: var(--primary-color);">${data.code}</strong> &nbsp; - &nbsp; ${data.name}`;
+                a.style.fontWeight = "400";
+                
+                a.onclick = function(e) {
+                    e.preventDefault(); 
+                    const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
+                    const newRow = table.insertRow();
+                    newRow.innerHTML = createRowHTML(data);
+                    attachDragEvents(newRow);
+                    calculateSingleRow(newRow);
+                    saveData();
+                    
+                    document.getElementById("presetDropdownContainer").classList.remove('show');
+                    document.getElementById("subjectSearch").value = ""; 
+                    filterSubjects(); 
+                };
+                li.appendChild(a);
+                resList.appendChild(li);
+            }
+        });
+    });
+
+    if (!found) {
+        resList.innerHTML = `<li class="dropdown-item" style="color: var(--error-color); justify-content: center; cursor: default;">❌ Không tìm thấy môn học</li>`;
+    }
+}
+
+// ==========================================
+// 2. KÉO THẢ (DRAG & DROP)
+// ==========================================
+let dragSrcEl = null;
+
+function handleDragStart(e) {
+    dragSrcEl = this;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+    this.classList.add('dragging');
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) { e.preventDefault(); }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter(e) {
+    this.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) { e.stopPropagation(); }
+    
+    if (dragSrcEl !== this) {
+        const tbody = this.parentNode;
+        const rows = Array.from(tbody.children);
+        const srcIndex = rows.indexOf(dragSrcEl);
+        const tgtIndex = rows.indexOf(this);
+
+        if (srcIndex < tgtIndex) {
+            this.after(dragSrcEl);
+        } else {
+            this.before(dragSrcEl);
+        }
+    }
+    return false;
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+    const rows = document.querySelectorAll('#subjectTable tbody tr');
+    rows.forEach(row => row.classList.remove('drag-over'));
+    saveData(); 
+}
+
+function attachDragEvents(row) {
+    row.setAttribute('draggable', 'true');
+    row.addEventListener('dragstart', handleDragStart, false);
+    row.addEventListener('dragenter', handleDragEnter, false);
+    row.addEventListener('dragover', handleDragOver, false);
+    row.addEventListener('dragleave', handleDragLeave, false);
+    row.addEventListener('drop', handleDrop, false);
+    row.addEventListener('dragend', handleDragEnd, false);
+}
+
+// ==========================================
+// 3. TẠO HTML ROW & XỬ LÝ GIAO DIỆN CHUNG
+// ==========================================
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute("data-theme");
     const btn = document.getElementById("themeBtn");
     if (currentTheme === "dark") {
         document.documentElement.removeAttribute("data-theme");
         btn.innerHTML = "🌙 Chế độ tối";
-        localStorage.setItem("uit_gpa_theme_store", "light"); // Lưu trạng thái sáng
+        localStorage.setItem("uit_gpa_theme_store", "light"); 
     } else {
         document.documentElement.setAttribute("data-theme", "dark");
         btn.innerHTML = "☀️ Chế độ sáng";
-        localStorage.setItem("uit_gpa_theme_store", "dark"); // Lưu trạng thái tối
+        localStorage.setItem("uit_gpa_theme_store", "dark"); 
     }
 }
 
-// Hàm tạo cấu trúc HTML cho một dòng môn học
 function createRowHTML(data = {}) {
     const code = data.code || "";
     const name = data.name || "";
@@ -27,15 +157,16 @@ function createRowHTML(data = {}) {
     const gk = data.gk || "";
     const ck = data.ck || "";
     const expected = data.expected || "";
-    const w_qt = data.w_qt !== undefined ? data.w_qt : "10";
-    const w_th = data.w_th !== undefined ? data.w_th : "20";
-    const w_gk = data.w_gk !== undefined ? data.w_gk : "30";
-    const w_ck = data.w_ck !== undefined ? data.w_ck : "40";
+    const w_qt = data.w_qt !== undefined ? data.w_qt : "20";
+    const w_th = data.w_th !== undefined ? data.w_th : "0";
+    const w_gk = data.w_gk !== undefined ? data.w_gk : "20";
+    const w_ck = data.w_ck !== undefined ? data.w_ck : "60";
 
     return `
-        <td><input type="text" class="sub-code" placeholder="Mã MH" value="${code}"></td>
-        <td><input type="text" class="sub-name" placeholder="Tên môn học" value="${name}"></td>
-        <td><input type="number" class="sub-credits" min="1" value="${credits}"></td>
+        <td><div class="drag-handle" title="Kéo để di chuyển">☰</div></td>
+        <td><input type="text" class="sub-code borderless" placeholder="Mã MH" value="${code}"></td>
+        <td><input type="text" class="sub-name borderless" placeholder="Tên môn học" value="${name}"></td>
+        <td><input type="number" class="sub-credits borderless" min="1" value="${credits}"></td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-qt" placeholder="Trống" value="${qt}">
@@ -66,32 +197,28 @@ function createRowHTML(data = {}) {
     `;
 }
 
-// Hàm thêm dòng mới
 function addRow() {
     const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
     const newRow = table.insertRow();
     newRow.innerHTML = createRowHTML();
+    attachDragEvents(newRow);
     calculateSingleRow(newRow);
-    saveData(); // Tự động lưu lại trạng thái bảng mới
+    saveData();
 }
 
-// Hàm xóa dòng
 function deleteRow(button) {
     const tbody = button.closest('tbody');
     if (tbody.rows.length > 1) {
         tbody.removeChild(button.closest('tr'));
-        saveData(); // Tự động lưu sau khi xóa
+        saveData(); 
     } else {
         alert("Phải giữ lại ít nhất một môn học!");
     }
 }
 
-
 // ==========================================
-// 2. LOGIC TÍNH TOÁN ĐIỂM SỐ
+// 4. THUẬT TOÁN TÍNH TOÁN ĐIỂM SỐ (ĐÃ THÊM LÀM TRÒN)
 // ==========================================
-
-// Quy đổi điểm hệ 10 sang hệ 4 theo quy chế UIT
 function convertToHệ4(grade10) {
     if (grade10 >= 8.5) return 4.0;
     if (grade10 >= 8.0) return 3.5;
@@ -103,7 +230,6 @@ function convertToHệ4(grade10) {
     return 0.0;
 }
 
-// Xếp loại học lực dựa trên GPA hệ 4
 function getRank(gpa4) {
     if (gpa4 >= 3.6) return "Xuất sắc";
     if (gpa4 >= 3.2) return "Giỏi";
@@ -112,7 +238,6 @@ function getRank(gpa4) {
     return "Yếu/Kém";
 }
 
-// Tính toán thời gian thực cho duy nhất 1 hàng môn học
 function calculateSingleRow(row) {
     let w_qt_el = row.querySelector(".w-qt");
     let w_th_el = row.querySelector(".w-th");
@@ -129,12 +254,8 @@ function calculateSingleRow(row) {
     const avgCell = row.querySelector(".final-grade");
     const totalWeight = w_qt + w_th + w_gk + w_ck;
     
-    // Kiểm tra xem tổng tỉ lệ phần trăm có bằng 100% không
     if (Math.abs(totalWeight - 1) > 0.001) {
-        if (avgCell) {
-            avgCell.innerText = "Sai %";
-            avgCell.style.color = "var(--error-color)";
-        }
+        if (avgCell) { avgCell.innerText = "Sai %"; avgCell.style.color = "var(--error-color)"; }
         return; 
     } else {
         if (avgCell) avgCell.style.color = "var(--primary-color)";
@@ -146,7 +267,6 @@ function calculateSingleRow(row) {
     const inputCk = row.querySelector(".sub-ck");
     const expectedInput = row.querySelector(".sub-expected");
 
-    // Clear các ô tự động tính toán từ lần trước để tránh sai số
     [inputQt, inputTh, inputGk, inputCk].forEach(input => {
         if (input && input.classList.contains("auto-calculated")) {
             input.value = "";
@@ -160,7 +280,6 @@ function calculateSingleRow(row) {
     let ck = inputCk.value.trim() === "" ? null : parseFloat(inputCk.value);
     let expected = expectedInput.value.trim() === "" ? null : parseFloat(expectedInput.value);
 
-    // Tính toán điểm kỳ vọng gánh kèo cho các cột trống
     if (expected !== null && !isNaN(expected)) {
         let currentPoints = 0;
         let missingWeight = 0;
@@ -178,7 +297,7 @@ function calculateSingleRow(row) {
             missingInputs.forEach(input => {
                 input.value = requiredScore.toFixed(1);
                 input.classList.add("auto-calculated");
-                if (requiredScore > 10) input.classList.add("over-limit"); // Tô đỏ nếu bất khả thi
+                if (requiredScore > 10) input.classList.add("over-limit"); 
                 else input.classList.remove("over-limit");
             });
 
@@ -194,13 +313,15 @@ function calculateSingleRow(row) {
         if (ck === null) ck = 0;
     }
 
-    const subjectAvg10 = (qt * w_qt) + (th * w_th) + (gk * w_gk) + (ck * w_ck);
+    // LÀM TRÒN ĐIỂM HỆ 10 THEO CHUẨN UIT (1 CHỮ SỐ THẬP PHÂN)
+    let subjectAvg10 = (qt * w_qt) + (th * w_th) + (gk * w_gk) + (ck * w_ck);
+    subjectAvg10 = Math.round((subjectAvg10 + Number.EPSILON) * 10) / 10;
+    
     if (avgCell && !isNaN(subjectAvg10)) {
-        avgCell.innerText = subjectAvg10.toFixed(2);
+        avgCell.innerText = subjectAvg10.toFixed(1); // Hiển thị chuẩn 1 số (vd: 9.7)
     }
 }
 
-// Tính tổng học kỳ khi bấm nút "Tính toán tổng GPA"
 function calculateTotalGPA() {
     document.querySelectorAll("#subjectTable tbody tr").forEach(row => calculateSingleRow(row));
 
@@ -215,10 +336,7 @@ function calculateTotalGPA() {
         if (isNaN(credits) || credits <= 0) return;
 
         const avgText = row.querySelector(".final-grade").innerText;
-        if (avgText === "Sai %") {
-            hasError = true;
-            return;
-        }
+        if (avgText === "Sai %") { hasError = true; return; }
 
         const w_qt = (parseFloat(row.querySelector(".w-qt").value) || 0) / 100;
         const w_th = (parseFloat(row.querySelector(".w-th").value) || 0) / 100;
@@ -230,22 +348,17 @@ function calculateTotalGPA() {
         const gk = parseFloat(row.querySelector(".sub-gk").value) || 0;
         const ck = parseFloat(row.querySelector(".sub-ck").value) || 0;
 
-        const subjectAvg10 = (qt * w_qt) + (th * w_th) + (gk * w_gk) + (ck * w_ck);
+        // TÍNH LẠI VÀ LÀM TRÒN ĐIỂM TỪNG MÔN TRƯỚC KHI CỘNG VÀO TỔNG
+        let subjectAvg10 = (qt * w_qt) + (th * w_th) + (gk * w_gk) + (ck * w_ck);
+        subjectAvg10 = Math.round((subjectAvg10 + Number.EPSILON) * 10) / 10;
 
         totalCredits += credits;
         totalPoints10 += subjectAvg10 * credits;
         totalPoints4 += convertToHệ4(subjectAvg10) * credits;
     });
 
-    if (hasError) {
-        alert("⚠️ Có môn học nhập sai tổng % (không bằng 100%). Sửa lỗi màu đỏ trước khi tính!");
-        return;
-    }
-
-    if (totalCredits === 0) {
-        alert("Vui lòng nhập ít nhất 1 môn có số tín chỉ lớn hơn 0!");
-        return;
-    }
+    if (hasError) { alert("⚠️ Có môn học nhập sai tổng % (không bằng 100%). Sửa lỗi màu đỏ trước khi tính!"); return; }
+    if (totalCredits === 0) { alert("Vui lòng nhập ít nhất 1 môn có số tín chỉ lớn hơn 0!"); return; }
 
     const finalGpa10 = (totalPoints10 / totalCredits).toFixed(2);
     const finalGpa4 = (totalPoints4 / totalCredits).toFixed(2);
@@ -259,12 +372,9 @@ function calculateTotalGPA() {
     document.getElementById("resultBox").style.display = "block";
 }
 
-
 // ==========================================
-// 3. QUẢN LÝ LƯU TRỮ LOCAL STORAGE (ĐÃ FIX LỖI PATH)
+// 5. LOCAL STORAGE
 // ==========================================
-
-// Hàm lưu ngầm toàn bộ dữ liệu bảng vào trình duyệt (Đổi tên Key độc quyền)
 function saveData() {
     const rows = document.querySelectorAll("#subjectTable tbody tr");
     const data = [];
@@ -284,68 +394,154 @@ function saveData() {
             w_ck: row.querySelector(".w-ck").value
         });
     });
-    // Sử dụng Key độc quyền để không bị lỗi phân tách folder của GitHub Pages
     localStorage.setItem("uit_gpa_data_store", JSON.stringify(data));
 }
 
-// Hàm tải dữ liệu cũ lên lại giao diện khi load trang
 function loadData() {
-    // Phục hồi giao diện sáng/tối
     if (localStorage.getItem("uit_gpa_theme_store") === "dark") {
         document.documentElement.setAttribute("data-theme", "dark");
         document.getElementById("themeBtn").innerHTML = "☀️ Chế độ sáng";
     }
 
-    // Phục hồi dữ liệu bảng điểm
     const savedData = localStorage.getItem("uit_gpa_data_store");
     if (savedData) {
         try {
             const data = JSON.parse(savedData);
             const tbody = document.querySelector("#subjectTable tbody");
             if (data && data.length > 0) {
-                tbody.innerHTML = ""; // Clear hàng mẫu mặc định trong HTML
+                tbody.innerHTML = ""; 
                 data.forEach(item => {
                     const newRow = tbody.insertRow();
                     newRow.innerHTML = createRowHTML(item);
-                    calculateSingleRow(newRow); // Chạy hàm tính toán luôn cho môn đó
+                    attachDragEvents(newRow); 
+                    calculateSingleRow(newRow); 
                 });
             }
         } catch (e) {
-            console.error("Lỗi phục hồi dữ liệu bảng:", e);
+            console.error("Lỗi phục hồi dữ liệu:", e);
         }
     } else {
-        // Nếu là lần đầu tiên mở web (chưa có data lưu trữ), tính toán hàng mẫu mặc định
-        document.querySelectorAll("#subjectTable tbody tr").forEach(row => calculateSingleRow(row));
+        addRow(); 
     }
 }
 
+// ==========================================
+// 6. CẤU TRÚC PRESET MÔN CE & TẠO MENU CHÍNH
+// ==========================================
+const PRESET_DATA = [
+    {
+        category: "📚 Khối Đại Cương",
+        subjects: [
+            { code: "IT001", name: "Nhập môn lập trình", credits: 3, w_qt: 20, w_gk: 0, w_th: 40, w_ck: 40 },
+            { code: "IT003", name: "Cấu trúc Dữ liệu", credits: 3, w_qt: 20, w_gk: 0, w_th: 40, w_ck: 40 },
+            { code: "PH002", name: "Nhập môn mạch số", credits: 3, w_qt: 15, w_gk: 15, w_th: 20, w_ck: 50 },
+            { code: "IT006", name: "Kiến trúc máy tính", credits: 3, w_qt: 30, w_gk: 20, w_th: 0, w_ck: 50 },
+            { code: "MA006", name: "Giải tích", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
+            { code: "MA003", name: "Đại số tuyến tính", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
+            { code: "MA004", name: "Cấu trúc rời rạc", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
+            { code: "MA005", name: "Xác suất thống kê", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 }
+        ]
+    },
+    {
+        category: "💻 Cơ Sở Ngành (TKVM)",
+        subjects: [
+            { code: "CE006", name: "Giới thiệu ngành TKVM", credits: 3, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "CE126", name: "Vật lý bán dẫn và ứng dụng", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "CE125", name: "Kỹ thuật phân tích mạch", credits: 3, w_qt: 30, w_gk: 0, w_th: 20, w_ck: 50 },
+            { code: "CE118", name: "Thiết kế luận lý số", credits: 3, w_qt: 25, w_gk: 0, w_th: 25, w_ck: 50 },
+            { code: "CE119", name: "Thực hành kiến trúc máy tính", credits: 1, w_qt: 0, w_gk: 0, w_th: 0, w_ck: 100 },
+            { code: "CE124", name: "Các thiết bị và mạch điện tử", credits: 3, w_qt: 25, w_gk: 0, w_th: 25, w_ck: 50 },
+            { code: "CE103", name: "Vi xử lý - Vi điều khiển", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "IT007", name: "Hệ điều hành", credits: 3, w_qt: 15, w_gk: 15, w_th: 20, w_ck: 50 },
+            { code: "CE213", name: "Thiết kế hệ thống số với HDL", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "CE226", name: "Thiết kế VLSI", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "CE436", name: "Xử lý tín hiệu số và ứng dụng", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "CE433", name: "SoC Design", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 }
+        ]
+    },
+    {
+        category: "🌍 Khối Lý luận Xã hội",
+        subjects: [
+            { code: "SS003", name: "Tư tưởng Hồ Chí Minh", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS004", name: "Kỹ năng nghề nghiệp", credits: 2, w_qt: 40, w_gk: 0, w_th: 0, w_ck: 60 },
+            { code: "SS006", name: "Pháp luật đại cương", credits: 2, w_qt: 0, w_gk: 40, w_th: 0, w_ck: 60 },
+            { code: "SS007", name: "Triết học Mác-Lênin", credits: 3, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS008", name: "Kinh tế chính trị Mác-Lênin", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS009", name: "Chủ nghĩa xã hội khoa học", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS010", name: "Lịch sử Đảng", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+        ]
+    }
+];
+
+function renderDropdownMenu() {
+    const menu = document.getElementById("presetDropdownMenu");
+    if (!menu) return;
+    
+    menu.innerHTML = ""; 
+    
+    PRESET_DATA.forEach(group => {
+        const liGroup = document.createElement("li");
+        liGroup.className = "dropdown-item-container";
+        
+        const groupLink = document.createElement("a");
+        groupLink.className = "dropdown-item";
+        groupLink.innerHTML = `${group.category} <span style="font-size: 10px; color: #9ca3af;">▶</span>`;
+        liGroup.appendChild(groupLink);
+
+        const ulSubmenu = document.createElement("ul");
+        ulSubmenu.className = "submenu";
+
+        group.subjects.forEach(data => {
+            const liSub = document.createElement("li");
+            const subLink = document.createElement("a");
+            subLink.className = "dropdown-item";
+            subLink.innerText = `${data.code} - ${data.name}`;
+            
+            subLink.onclick = function(e) {
+                e.preventDefault(); 
+                
+                const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
+                const newRow = table.insertRow();
+                newRow.innerHTML = createRowHTML(data);
+                attachDragEvents(newRow); 
+                calculateSingleRow(newRow);
+                saveData();
+                
+                document.getElementById("presetDropdownContainer").classList.remove('show');
+            };
+            liSub.appendChild(subLink);
+            ulSubmenu.appendChild(liSub);
+        });
+
+        liGroup.appendChild(ulSubmenu);
+        menu.appendChild(liGroup);
+    });
+}
 
 // ==========================================
-// 4. KHỞI ĐỘNG VÀ LẮNG NGHE SỰ KIỆN
+// 7. KHỞI CHẠY HỆ THỐNG
 // ==========================================
-
 document.addEventListener("DOMContentLoaded", function() {
-    loadData(); // Gọi hàm lôi dữ liệu cũ lên ngay khi vừa dựng DOM xong
+    renderDropdownMenu();
+    loadData(); 
 
     const table = document.getElementById('subjectTable');
     if (table) {
-        // Lắng nghe sự kiện người dùng nhập dữ liệu liên tục (Real-time)
         table.addEventListener('input', function(event) {
             if (event.target.tagName === "INPUT") {
                 const row = event.target.closest('tr');
                 if (row) calculateSingleRow(row);
-                saveData(); // Gõ tới đâu lưu ngầm tới đó
+                saveData(); 
             }
         });
     }
 
-    // Lắng nghe phím Enter chỉ cập nhật riêng dòng môn học đó
     document.addEventListener("keydown", function(event) {
         if (event.key === "Enter" && event.target.tagName === "INPUT") {
             event.preventDefault(); 
             const row = event.target.closest('tr');
             if (row) calculateSingleRow(row);
-            saveData(); // Lưu lại dữ liệu sau khi bấm Enter
+            saveData(); 
         }
     });
 });
