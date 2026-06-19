@@ -5,20 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tính Điểm & Dự Đoán GPA UIT</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+
+<div class="bg-blob blob-purple"></div>
+<div class="bg-blob blob-cyan"></div>
 
 <div class="container">
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 Chế độ tối</button>
 
-    <h2>📊 Công Cụ Tính Điểm & Dự Đoán GPA</h2>
-    <div class="subtitle">
-        Gọn gàng - Nhanh chóng.<br>
-        Tỷ lệ % (mờ bên dưới) có thể tùy chỉnh cho từng cột.
+    <div class="header-section">
+        <h2>📊 Công Cụ Tính Điểm & Dự Đoán GPA</h2>
+        <div class="subtitle">Gọn gàng - Nhanh chóng. Tỷ lệ % có thể tùy chỉnh cho từng cột.</div>
+    </div>
+
+    <div class="dashboard-wrapper">
+        <div class="dashboard-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">GPA (Hệ 10)</div>
+                <div class="kpi-value" id="resGpa10">0.0</div>
+            </div>
+            <div class="kpi-card highlight-card">
+                <div class="kpi-title">GPA (Hệ 4)</div>
+                <div class="kpi-value" id="resGpa4">0.0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Xếp loại</div>
+                <div class="kpi-value rank-text" id="resRank">-</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Tổng Tín Chỉ</div>
+                <div class="kpi-value" id="resTotalCredits">0</div>
+            </div>
+        </div>
     </div>
 
     <div class="top-action-bar">
-        <button class="btn btn-add" onclick="addRow()">➕ Thêm môn trống</button>
+        <button class="btn btn-add" onclick="addRow()"><i class="fa-solid fa-plus"></i> Thêm môn trống</button>
         
         <div class="dropdown">
             <button class="btn btn-preset" onclick="toggleMainMenu(event)">📌 Thêm môn có sẵn ▼</button>
@@ -26,28 +50,32 @@
                 <div class="search-box">
                     <input type="text" id="subjectSearch" placeholder="🔍 Tìm mã hoặc tên môn..." onkeyup="filterSubjects()" onclick="event.stopPropagation()">
                 </div>
-                <ul class="dropdown-list" id="presetDropdownMenu">
-                    </ul>
-                <ul class="dropdown-list search-results" id="searchResults" style="display: none;">
-                    </ul>
+                <ul class="dropdown-list" id="presetDropdownMenu"></ul>
+                <ul class="dropdown-list search-results" id="searchResults" style="display: none;"></ul>
             </div>
+        </div>
+
+        <div class="quick-entry-box" title="Nhập Mã môn/Tên môn và các điểm số cách nhau bằng khoảng trắng. Bấm Enter để thêm!">
+            <i class="fa-solid fa-bolt"></i>
+            <input type="text" id="quickEntryInput" placeholder="Nhập nhanh: CE118 9 8 7.5" onkeydown="handleQuickEntry(event)">
         </div>
     </div>
 
-    <div class="table-responsive">
+    <div class="glass-card table-responsive">
         <table id="subjectTable">
             <thead>
                 <tr>
-                    <th style="width: 3%; text-align: center;"></th> <th style="width: 9%;">Mã MH</th>
+                    <th style="width: 3%; text-align: center;"></th>
+                    <th style="width: 9%;">Mã MH</th>
                     <th style="width: 20%; text-align: left; padding-left: 8px;">Tên MH</th>
                     <th style="width: 5%;">TC</th>
                     <th style="width: 9%;">QT</th>
                     <th style="width: 9%;">TH</th>
                     <th style="width: 9%;">GK</th>
                     <th style="width: 9%;">CK</th>
-                    <th style="width: 9%;">Điểm HP</th>
-                    <th style="width: 10%;">Điểm KV</th>
-                    <th style="width: 8%;">Thao tác</th>
+                    <th style="width: 10%;">Điểm HP</th>
+                    <th style="width: 9%;">Điểm KV</th>
+                    <th style="width: 5%;"></th>
                 </tr>
             </thead>
             <tbody>
@@ -56,17 +84,7 @@
     </div>
 
     <div class="bottom-action-bar">
-        <button class="btn btn-calc" onclick="calculateTotalGPA()">🧮 Tính toán tổng GPA</button>
-    </div>
-
-    <div class="result-box" id="resultBox">
-        <h3 style="margin-top: 0; color: var(--result-text);">Kết quả học tập tổng kết:</h3>
-        <div class="result-grid">
-            <div class="result-item"><div>Tổng số tín chỉ</div><div class="result-value" id="resTotalCredits">0</div></div>
-            <div class="result-item"><div>GPA (Hệ 10)</div><div class="result-value" id="resGpa10">0.0</div></div>
-            <div class="result-item"><div>GPA (Hệ 4)</div><div class="result-value" id="resGpa4">0.0</div></div>
-            <div class="result-item"><div>Xếp loại</div><div class="result-value" id="resRank" style="color: var(--primary-color);">-</div></div>
-        </div>
+        <button class="btn btn-calc" onclick="calculateTotalGPA()"><i class="fa-solid fa-calculator"></i> Tính toán tổng GPA</button>
     </div>
 </div>
 

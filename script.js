@@ -1,11 +1,18 @@
 // ==========================================
-// 1. QUẢN LÝ DROPDOWN & TÌM KIẾM
+// 0. TIỆN ÍCH CHUNG (KHỬ DẤU TIẾNG VIỆT)
+// ==========================================
+function removeVietnameseTones(str) {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+              .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+}
+
+// ==========================================
+// 1. QUẢN LÝ DROPDOWN & NHẬP NHANH (QUICK ENTRY)
 // ==========================================
 function toggleMainMenu(event) {
     event.stopPropagation(); 
     const container = document.getElementById("presetDropdownContainer");
     container.classList.toggle("show");
-    
     if (container.classList.contains("show")) {
         setTimeout(() => document.getElementById("subjectSearch").focus(), 50);
     }
@@ -21,7 +28,8 @@ window.onclick = function(event) {
 }
 
 function filterSubjects() {
-    const query = document.getElementById("subjectSearch").value.toLowerCase();
+    const rawQuery = document.getElementById("subjectSearch").value.toLowerCase();
+    const query = removeVietnameseTones(rawQuery);
     const catList = document.getElementById("presetDropdownMenu");
     const resList = document.getElementById("searchResults");
 
@@ -38,22 +46,27 @@ function filterSubjects() {
     let found = false;
     PRESET_DATA.forEach(group => {
         group.subjects.forEach(data => {
-            if (data.code.toLowerCase().includes(query) || data.name.toLowerCase().includes(query)) {
+            const normCode = removeVietnameseTones(data.code.toLowerCase());
+            const normName = removeVietnameseTones(data.name.toLowerCase());
+
+            if (normCode.includes(query) || normName.includes(query)) {
                 found = true;
                 const li = document.createElement("li");
                 const a = document.createElement("a");
                 a.className = "dropdown-item";
-                a.innerHTML = `<strong style="color: var(--primary-color);">${data.code}</strong> &nbsp; - &nbsp; ${data.name}`;
-                a.style.fontWeight = "400";
+                a.innerHTML = `<span><strong style="color: var(--primary-color);">${data.code}</strong> - ${data.name}</span>`;
+                a.style.fontWeight = "500";
                 
                 a.onclick = function(e) {
                     e.preventDefault(); 
                     const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
                     const newRow = table.insertRow();
-                    newRow.innerHTML = createRowHTML(data);
+                    newRow.setAttribute("data-preset", "true");
+                    newRow.innerHTML = createRowHTML(data, true);
                     attachDragEvents(newRow);
                     calculateSingleRow(newRow);
                     saveData();
+                    calculateTotalGPA();
                     
                     document.getElementById("presetDropdownContainer").classList.remove('show');
                     document.getElementById("subjectSearch").value = ""; 
@@ -70,6 +83,133 @@ function filterSubjects() {
     }
 }
 
+// ---------------------------------------------------------
+// THUẬT TOÁN XỬ LÝ "NHẬP NHANH" ĐỈNH CAO
+// ---------------------------------------------------------
+function handleQuickEntry(event) {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        const inputEl = document.getElementById("quickEntryInput");
+        const rawText = inputEl.value.trim();
+        if (!rawText) return;
+
+        let query = rawText;
+        let numberStr = "";
+        let parsedNums = [];
+
+        // Dùng Regex bóc tách 2 phần: [Tên môn/Mã môn] và [Cụm số điểm ở đuôi]
+        const match = rawText.match(/^(.*?)\s+([\d\.\s]+)$/);
+        
+        if (match) {
+            let tempQuery = removeVietnameseTones(match[1].trim().toLowerCase());
+            let foundSub = findSubject(tempQuery);
+            
+            if (foundSub) {
+                query = tempQuery;
+                numberStr = match[2].replace(/\s+/g, ''); // Ép các số dính liền vào nhau
+                parsedNums = parseGluedNumbers(numberStr); // Chạy hàm mổ xẻ số
+            } else {
+                query = removeVietnameseTones(rawText.toLowerCase());
+            }
+        } else {
+            // Trường hợp user gõ dính luôn cả chữ và số (VD: CE1184987.5)
+            const stickyMatch = rawText.match(/^([a-zA-Z]+\d+)([\d\.]+)$/);
+            if (stickyMatch) {
+                let tempQuery = removeVietnameseTones(stickyMatch[1].toLowerCase());
+                if (findSubject(tempQuery)) {
+                    query = tempQuery;
+                    parsedNums = parseGluedNumbers(stickyMatch[2]);
+                } else {
+                    query = removeVietnameseTones(rawText.toLowerCase());
+                }
+            } else {
+                query = removeVietnameseTones(rawText.toLowerCase());
+            }
+        }
+
+        let matchedSubject = findSubject(query);
+
+        if (!matchedSubject) {
+            alert(`❌ Không tìm thấy môn học nào khớp với: "${rawText}"\nVui lòng kiểm tra lại mã hoặc tên môn.`);
+            return;
+        }
+
+        const newSubData = { ...matchedSubject };
+
+        // Đếm xem môn này có bao nhiêu cột tính điểm (bỏ qua cột 0%)
+        const activeSlots = [];
+        if (newSubData.w_qt > 0) activeSlots.push('qt');
+        if (newSubData.w_th > 0) activeSlots.push('th');
+        if (newSubData.w_gk > 0) activeSlots.push('gk');
+        if (newSubData.w_ck > 0) activeSlots.push('ck');
+
+        if (parsedNums.length > 0) {
+            // Nếu độ dài mảng số dư 1 so với số cột điểm, 100% số đầu tiên là Tín chỉ
+            if (parsedNums.length >= activeSlots.length + 1) {
+                newSubData.credits = parsedNums[0];
+                parsedNums = parsedNums.slice(1); // Cắt bỏ tín chỉ, chừa lại điểm
+            }
+            
+            // Đổ điểm theo thứ tự vào các ô đang mở
+            for (let i = 0; i < parsedNums.length && i < activeSlots.length; i++) {
+                newSubData[activeSlots[i]] = parsedNums[i];
+            }
+        }
+
+        // Tạo giao diện
+        const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
+        const newRow = table.insertRow();
+        newRow.setAttribute("data-preset", "true");
+        newRow.innerHTML = createRowHTML(newSubData, true);
+        attachDragEvents(newRow);
+        calculateSingleRow(newRow);
+        saveData();
+        calculateTotalGPA();
+
+        inputEl.value = ""; // Xóa trắng thanh nhập sau khi add thành công
+    }
+}
+
+// Hàm hỗ trợ: Tìm môn học trong PRESET
+function findSubject(query) {
+    for (const group of PRESET_DATA) {
+        let found = group.subjects.find(sub => {
+            const normCode = removeVietnameseTones(sub.code.toLowerCase());
+            const normName = removeVietnameseTones(sub.name.toLowerCase());
+            return normCode === query || normName.includes(query);
+        });
+        if (found) return found;
+    }
+    return null;
+}
+
+// Hàm hỗ trợ: Bóc tách chuỗi số dính liền (VD: "4987.5" -> [4, 9, 8, 7.5])
+function parseGluedNumbers(str) {
+    let nums = [];
+    let i = 0;
+    while (i < str.length) {
+        if (str.substring(i).startsWith('10')) {
+            if (str[i+2] === '.' && str[i+3] >= '0' && str[i+3] <= '9') {
+                nums.push(parseFloat(str.substring(i, i+4)));
+                i += 4;
+            } else {
+                nums.push(10);
+                i += 2;
+            }
+        } else {
+            // Chỉ lấy 1 chữ số thập phân tối đa để khỏi dính chùm
+            let m = str.substring(i).match(/^\d(\.\d)?/);
+            if (m) {
+                nums.push(parseFloat(m[0]));
+                i += m[0].length;
+            } else {
+                i++; 
+            }
+        }
+    }
+    return nums;
+}
+
 // ==========================================
 // 2. KÉO THẢ (DRAG & DROP)
 // ==========================================
@@ -83,46 +223,40 @@ function handleDragStart(e) {
 }
 
 function handleDragOver(e) {
-    if (e.preventDefault) { e.preventDefault(); }
+    if (e.preventDefault) e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     return false;
 }
 
-function handleDragEnter(e) {
-    this.classList.add('drag-over');
-}
-
-function handleDragLeave(e) {
-    this.classList.remove('drag-over');
-}
+function handleDragEnter(e) { this.classList.add('drag-over'); }
+function handleDragLeave(e) { this.classList.remove('drag-over'); }
 
 function handleDrop(e) {
-    if (e.stopPropagation) { e.stopPropagation(); }
-    
+    if (e.stopPropagation) e.stopPropagation();
     if (dragSrcEl !== this) {
         const tbody = this.parentNode;
         const rows = Array.from(tbody.children);
         const srcIndex = rows.indexOf(dragSrcEl);
         const tgtIndex = rows.indexOf(this);
-
-        if (srcIndex < tgtIndex) {
-            this.after(dragSrcEl);
-        } else {
-            this.before(dragSrcEl);
-        }
+        if (srcIndex < tgtIndex) this.after(dragSrcEl);
+        else this.before(dragSrcEl);
     }
     return false;
 }
 
 function handleDragEnd(e) {
     this.classList.remove('dragging');
+    this.setAttribute('draggable', 'false');
     const rows = document.querySelectorAll('#subjectTable tbody tr');
     rows.forEach(row => row.classList.remove('drag-over'));
     saveData(); 
 }
 
 function attachDragEvents(row) {
-    row.setAttribute('draggable', 'true');
+    const handle = row.querySelector('.drag-handle');
+    handle.addEventListener('mousedown', () => row.setAttribute('draggable', 'true'));
+    handle.addEventListener('mouseup', () => row.setAttribute('draggable', 'false'));
+    handle.addEventListener('mouseleave', () => row.setAttribute('draggable', 'false'));
     row.addEventListener('dragstart', handleDragStart, false);
     row.addEventListener('dragenter', handleDragEnter, false);
     row.addEventListener('dragover', handleDragOver, false);
@@ -148,7 +282,7 @@ function toggleTheme() {
     }
 }
 
-function createRowHTML(data = {}) {
+function createRowHTML(data = {}, isPreset = false) {
     const code = data.code || "";
     const name = data.name || "";
     const credits = data.credits || "3";
@@ -162,45 +296,49 @@ function createRowHTML(data = {}) {
     const w_gk = data.w_gk !== undefined ? data.w_gk : "20";
     const w_ck = data.w_ck !== undefined ? data.w_ck : "60";
 
+    const readonlyAttr = isPreset ? 'readonly title="Tỷ lệ chuẩn (Không thể sửa)"' : '';
+    const lockedClass = isPreset ? 'locked-weight' : '';
+
     return `
-        <td><div class="drag-handle" title="Kéo để di chuyển">☰</div></td>
+        <td><div class="drag-handle" title="Kéo để di chuyển"><i class="fa-solid fa-grip-vertical"></i></div></td>
         <td><input type="text" class="sub-code borderless" placeholder="Mã MH" value="${code}"></td>
         <td><input type="text" class="sub-name borderless" placeholder="Tên môn học" value="${name}"></td>
         <td><input type="number" class="sub-credits borderless" min="1" value="${credits}"></td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-qt" placeholder="Trống" value="${qt}">
-                <div class="weight-input-wrapper"><input type="number" class="w-qt" value="${w_qt}" min="0" max="100">%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-qt ${lockedClass}" value="${w_qt}" min="0" max="100" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-th" placeholder="Trống" value="${th}">
-                <div class="weight-input-wrapper"><input type="number" class="w-th" value="${w_th}" min="0" max="100">%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-th ${lockedClass}" value="${w_th}" min="0" max="100" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-gk" placeholder="Trống" value="${gk}">
-                <div class="weight-input-wrapper"><input type="number" class="w-gk" value="${w_gk}" min="0" max="100">%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-gk ${lockedClass}" value="${w_gk}" min="0" max="100" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-ck" placeholder="Trống" value="${ck}">
-                <div class="weight-input-wrapper"><input type="number" class="w-ck" value="${w_ck}" min="0" max="100">%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-ck ${lockedClass}" value="${w_ck}" min="0" max="100" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td class="final-grade">-</td>
         <td><input type="number" class="sub-expected" min="0" max="10" step="0.1" placeholder="Mục tiêu" value="${expected}"></td>
-        <td><button class="btn btn-delete" onclick="deleteRow(this)">Xóa</button></td>
+        <td><button class="btn-delete-icon" onclick="deleteRow(this)" title="Xóa môn này"><i class="fa-solid fa-trash-can"></i></button></td>
     `;
 }
 
 function addRow() {
     const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
     const newRow = table.insertRow();
-    newRow.innerHTML = createRowHTML();
+    newRow.setAttribute("data-preset", "false"); 
+    newRow.innerHTML = createRowHTML({}, false);
     attachDragEvents(newRow);
     calculateSingleRow(newRow);
     saveData();
@@ -211,13 +349,14 @@ function deleteRow(button) {
     if (tbody.rows.length > 1) {
         tbody.removeChild(button.closest('tr'));
         saveData(); 
+        calculateTotalGPA();
     } else {
         alert("Phải giữ lại ít nhất một môn học!");
     }
 }
 
 // ==========================================
-// 4. THUẬT TOÁN TÍNH TOÁN ĐIỂM SỐ (ĐÃ THÊM LÀM TRÒN)
+// 4. THUẬT TOÁN TÍNH TOÁN ĐIỂM SỐ
 // ==========================================
 function convertToHệ4(grade10) {
     if (grade10 >= 8.5) return 4.0;
@@ -255,10 +394,8 @@ function calculateSingleRow(row) {
     const totalWeight = w_qt + w_th + w_gk + w_ck;
     
     if (Math.abs(totalWeight - 1) > 0.001) {
-        if (avgCell) { avgCell.innerText = "Sai %"; avgCell.style.color = "var(--error-color)"; }
+        if (avgCell) { avgCell.innerHTML = `<span class="hp-badge badge-red">Sai %</span>`; }
         return; 
-    } else {
-        if (avgCell) avgCell.style.color = "var(--primary-color)";
     }
 
     const inputQt = row.querySelector(".sub-qt");
@@ -267,10 +404,26 @@ function calculateSingleRow(row) {
     const inputCk = row.querySelector(".sub-ck");
     const expectedInput = row.querySelector(".sub-expected");
 
-    [inputQt, inputTh, inputGk, inputCk].forEach(input => {
-        if (input && input.classList.contains("auto-calculated")) {
-            input.value = "";
-            input.classList.remove("auto-calculated", "over-limit");
+    const inputConfigs = [
+        { el: inputQt, weight: w_qt },
+        { el: inputTh, weight: w_th },
+        { el: inputGk, weight: w_gk },
+        { el: inputCk, weight: w_ck }
+    ];
+
+    inputConfigs.forEach(item => {
+        if (item.el) {
+            item.el.classList.remove("auto-calculated", "over-limit");
+            if (item.weight === 0) {
+                item.el.disabled = true;
+                item.el.value = ""; 
+                item.el.classList.add("disabled-grade");
+                item.el.placeholder = "🚫";
+            } else {
+                item.el.disabled = false;
+                item.el.classList.remove("disabled-grade");
+                if (item.el.placeholder === "🚫") item.el.placeholder = "Trống";
+            }
         }
     });
 
@@ -313,12 +466,16 @@ function calculateSingleRow(row) {
         if (ck === null) ck = 0;
     }
 
-    // LÀM TRÒN ĐIỂM HỆ 10 THEO CHUẨN UIT (1 CHỮ SỐ THẬP PHÂN)
     let subjectAvg10 = (qt * w_qt) + (th * w_th) + (gk * w_gk) + (ck * w_ck);
     subjectAvg10 = Math.round((subjectAvg10 + Number.EPSILON) * 10) / 10;
     
     if (avgCell && !isNaN(subjectAvg10)) {
-        avgCell.innerText = subjectAvg10.toFixed(1); // Hiển thị chuẩn 1 số (vd: 9.7)
+        let badgeClass = "badge-red"; 
+        if (subjectAvg10 >= 9.0) badgeClass = "badge-green"; 
+        else if (subjectAvg10 >= 8.0) badgeClass = "badge-blue"; 
+        else if (subjectAvg10 >= 6.5) badgeClass = "badge-yellow"; 
+
+        avgCell.innerHTML = `<span class="hp-badge ${badgeClass}">${subjectAvg10.toFixed(1)}</span>`;
     }
 }
 
@@ -348,7 +505,6 @@ function calculateTotalGPA() {
         const gk = parseFloat(row.querySelector(".sub-gk").value) || 0;
         const ck = parseFloat(row.querySelector(".sub-ck").value) || 0;
 
-        // TÍNH LẠI VÀ LÀM TRÒN ĐIỂM TỪNG MÔN TRƯỚC KHI CỘNG VÀO TỔNG
         let subjectAvg10 = (qt * w_qt) + (th * w_th) + (gk * w_gk) + (ck * w_ck);
         subjectAvg10 = Math.round((subjectAvg10 + Number.EPSILON) * 10) / 10;
 
@@ -358,18 +514,25 @@ function calculateTotalGPA() {
     });
 
     if (hasError) { alert("⚠️ Có môn học nhập sai tổng % (không bằng 100%). Sửa lỗi màu đỏ trước khi tính!"); return; }
-    if (totalCredits === 0) { alert("Vui lòng nhập ít nhất 1 môn có số tín chỉ lớn hơn 0!"); return; }
+    if (totalCredits === 0) { 
+        document.getElementById("resTotalCredits").innerText = 0;
+        document.getElementById("resGpa10").innerText = "0.00";
+        document.getElementById("resGpa4").innerText = "0.00";
+        document.getElementById("resRank").innerText = "-";
+        return; 
+    }
 
-    const finalGpa10 = (totalPoints10 / totalCredits).toFixed(2);
-    const finalGpa4 = (totalPoints4 / totalCredits).toFixed(2);
+    let rawGpa10 = totalPoints10 / totalCredits;
+    let rawGpa4 = totalPoints4 / totalCredits;
+
+    const finalGpa10 = (Math.round((rawGpa10 + Number.EPSILON) * 100) / 100).toFixed(2);
+    const finalGpa4 = (Math.round((rawGpa4 + Number.EPSILON) * 100) / 100).toFixed(2);
     const rank = getRank(parseFloat(finalGpa4));
 
     document.getElementById("resTotalCredits").innerText = totalCredits;
     document.getElementById("resGpa10").innerText = finalGpa10;
     document.getElementById("resGpa4").innerText = finalGpa4;
     document.getElementById("resRank").innerText = rank;
-    
-    document.getElementById("resultBox").style.display = "block";
 }
 
 // ==========================================
@@ -391,7 +554,8 @@ function saveData() {
             w_qt: row.querySelector(".w-qt").value,
             w_th: row.querySelector(".w-th").value,
             w_gk: row.querySelector(".w-gk").value,
-            w_ck: row.querySelector(".w-ck").value
+            w_ck: row.querySelector(".w-ck").value,
+            isPreset: row.getAttribute("data-preset") === "true" 
         });
     });
     localStorage.setItem("uit_gpa_data_store", JSON.stringify(data));
@@ -412,7 +576,8 @@ function loadData() {
                 tbody.innerHTML = ""; 
                 data.forEach(item => {
                     const newRow = tbody.insertRow();
-                    newRow.innerHTML = createRowHTML(item);
+                    newRow.setAttribute("data-preset", item.isPreset ? "true" : "false");
+                    newRow.innerHTML = createRowHTML(item, item.isPreset); 
                     attachDragEvents(newRow); 
                     calculateSingleRow(newRow); 
                 });
@@ -423,37 +588,38 @@ function loadData() {
     } else {
         addRow(); 
     }
+    setTimeout(calculateTotalGPA, 100);
 }
 
 // ==========================================
-// 6. CẤU TRÚC PRESET MÔN CE & TẠO MENU CHÍNH
+// 6. CẤU TRÚC PRESET MÔN CE
 // ==========================================
 const PRESET_DATA = [
     {
         category: "📚 Khối Đại Cương",
         subjects: [
-            { code: "IT001", name: "Nhập môn lập trình", credits: 3, w_qt: 20, w_gk: 0, w_th: 40, w_ck: 40 },
-            { code: "IT003", name: "Cấu trúc Dữ liệu", credits: 3, w_qt: 20, w_gk: 0, w_th: 40, w_ck: 40 },
-            { code: "PH002", name: "Nhập môn mạch số", credits: 3, w_qt: 15, w_gk: 15, w_th: 20, w_ck: 50 },
-            { code: "IT006", name: "Kiến trúc máy tính", credits: 3, w_qt: 30, w_gk: 20, w_th: 0, w_ck: 50 },
-            { code: "MA006", name: "Giải tích", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
+            { code: "IT001", name: "Nhập môn lập trình", credits: 4, w_qt: 20, w_gk: 0, w_th: 40, w_ck: 40 },
+            { code: "IT003", name: "Cấu trúc Dữ liệu", credits: 4, w_qt: 20, w_gk: 0, w_th: 40, w_ck: 40 },
+            { code: "PH002", name: "Nhập môn mạch số", credits: 4, w_qt: 15, w_gk: 15, w_th: 20, w_ck: 50 },
+            { code: "IT006", name: "Kiến trúc máy tính", credits: 4, w_qt: 30, w_gk: 20, w_th: 0, w_ck: 50 },
+            { code: "MA006", name: "Giải tích", credits: 4, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
             { code: "MA003", name: "Đại số tuyến tính", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
-            { code: "MA004", name: "Cấu trúc rời rạc", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
+            { code: "MA004", name: "Cấu trúc rời rạc", credits: 4, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 },
             { code: "MA005", name: "Xác suất thống kê", credits: 3, w_qt: 20, w_gk: 20, w_th: 0, w_ck: 60 }
         ]
     },
     {
         category: "💻 Cơ Sở Ngành (TKVM)",
         subjects: [
-            { code: "CE006", name: "Giới thiệu ngành TKVM", credits: 3, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
-            { code: "CE126", name: "Vật lý bán dẫn và ứng dụng", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
-            { code: "CE125", name: "Kỹ thuật phân tích mạch", credits: 3, w_qt: 30, w_gk: 0, w_th: 20, w_ck: 50 },
-            { code: "CE118", name: "Thiết kế luận lý số", credits: 3, w_qt: 25, w_gk: 0, w_th: 25, w_ck: 50 },
+            { code: "CE006", name: "Giới thiệu ngành TKVM", credits: 1, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "CE126", name: "Vật lý bán dẫn và ứng dụng", credits: 4, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "CE125", name: "Kỹ thuật phân tích mạch", credits: 4, w_qt: 30, w_gk: 0, w_th: 20, w_ck: 50 },
+            { code: "CE118", name: "Thiết kế luận lý số", credits: 4, w_qt: 25, w_gk: 0, w_th: 25, w_ck: 50 },
             { code: "CE119", name: "Thực hành kiến trúc máy tính", credits: 1, w_qt: 0, w_gk: 0, w_th: 0, w_ck: 100 },
-            { code: "CE124", name: "Các thiết bị và mạch điện tử", credits: 3, w_qt: 25, w_gk: 0, w_th: 25, w_ck: 50 },
-            { code: "CE103", name: "Vi xử lý - Vi điều khiển", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
-            { code: "IT007", name: "Hệ điều hành", credits: 3, w_qt: 15, w_gk: 15, w_th: 20, w_ck: 50 },
-            { code: "CE213", name: "Thiết kế hệ thống số với HDL", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "CE124", name: "Các thiết bị và mạch điện tử", credits: 4, w_qt: 25, w_gk: 0, w_th: 25, w_ck: 50 },
+            { code: "CE103", name: "Vi xử lý - Vi điều khiển", credits: 4, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
+            { code: "IT007", name: "Hệ điều hành", credits: 4, w_qt: 15, w_gk: 15, w_th: 20, w_ck: 50 },
+            { code: "CE213", name: "Thiết kế hệ thống số với HDL", credits: 4, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
             { code: "CE226", name: "Thiết kế VLSI", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
             { code: "CE436", name: "Xử lý tín hiệu số và ứng dụng", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 },
             { code: "CE433", name: "SoC Design", credits: 3, w_qt: 20, w_gk: 0, w_th: 30, w_ck: 50 }
@@ -465,10 +631,10 @@ const PRESET_DATA = [
             { code: "SS003", name: "Tư tưởng Hồ Chí Minh", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
             { code: "SS004", name: "Kỹ năng nghề nghiệp", credits: 2, w_qt: 40, w_gk: 0, w_th: 0, w_ck: 60 },
             { code: "SS006", name: "Pháp luật đại cương", credits: 2, w_qt: 0, w_gk: 40, w_th: 0, w_ck: 60 },
-            { code: "SS007", name: "Triết học Mác-Lênin", credits: 3, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
-            { code: "SS008", name: "Kinh tế chính trị Mác-Lênin", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS007", name: "Triết học Mác – Lênin", credits: 3, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS008", name: "Kinh tế chính trị Mác – Lênin", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
             { code: "SS009", name: "Chủ nghĩa xã hội khoa học", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
-            { code: "SS010", name: "Lịch sử Đảng", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS010", name: "Lịch sử Đảng Cộng sản Việt Nam", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 }
         ]
     }
 ];
@@ -476,13 +642,11 @@ const PRESET_DATA = [
 function renderDropdownMenu() {
     const menu = document.getElementById("presetDropdownMenu");
     if (!menu) return;
-    
     menu.innerHTML = ""; 
     
     PRESET_DATA.forEach(group => {
         const liGroup = document.createElement("li");
         liGroup.className = "dropdown-item-container";
-        
         const groupLink = document.createElement("a");
         groupLink.className = "dropdown-item";
         groupLink.innerHTML = `${group.category} <span style="font-size: 10px; color: #9ca3af;">▶</span>`;
@@ -495,24 +659,30 @@ function renderDropdownMenu() {
             const liSub = document.createElement("li");
             const subLink = document.createElement("a");
             subLink.className = "dropdown-item";
-            subLink.innerText = `${data.code} - ${data.name}`;
+            
+            let icon = "📘"; 
+            if (data.name.includes("Kiến trúc") || data.name.includes("Vi xử lý")) icon = "💻";
+            else if (data.name.includes("Toán") || data.name.includes("Giải tích") || data.name.includes("Đại số")) icon = "📐";
+            else if (data.name.includes("Triết") || data.name.includes("Tư tưởng") || data.name.includes("Đảng")) icon = "📖";
+            else if (data.name.includes("Mạch") || data.name.includes("Thiết bị") || data.name.includes("HDL")) icon = "🔌";
+
+            subLink.innerHTML = `<span style="margin-right: 8px;">${icon}</span> ${data.code} - ${data.name}`;
             
             subLink.onclick = function(e) {
                 e.preventDefault(); 
-                
                 const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
                 const newRow = table.insertRow();
-                newRow.innerHTML = createRowHTML(data);
+                newRow.setAttribute("data-preset", "true");
+                newRow.innerHTML = createRowHTML(data, true);
                 attachDragEvents(newRow); 
                 calculateSingleRow(newRow);
                 saveData();
-                
+                calculateTotalGPA();
                 document.getElementById("presetDropdownContainer").classList.remove('show');
             };
             liSub.appendChild(subLink);
             ulSubmenu.appendChild(liSub);
         });
-
         liGroup.appendChild(ulSubmenu);
         menu.appendChild(liGroup);
     });
@@ -542,6 +712,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const row = event.target.closest('tr');
             if (row) calculateSingleRow(row);
             saveData(); 
+            calculateTotalGPA(); 
         }
     });
 });
