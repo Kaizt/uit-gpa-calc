@@ -298,30 +298,30 @@ function createRowHTML(data = {}, isPreset = false) {
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-qt" placeholder="Trống" value="${qt}">
-                <div class="weight-input-wrapper"><input type="number" class="w-qt ${lockedClass}" value="${w_qt}" min="0" max="100" ${readonlyAttr}>%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-qt ${lockedClass}" value="${w_qt}" min="0" max="100" tabindex="-1" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-th" placeholder="Trống" value="${th}">
-                <div class="weight-input-wrapper"><input type="number" class="w-th ${lockedClass}" value="${w_th}" min="0" max="100" ${readonlyAttr}>%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-th ${lockedClass}" value="${w_th}" min="0" max="100" tabindex="-1" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-gk" placeholder="Trống" value="${gk}">
-                <div class="weight-input-wrapper"><input type="number" class="w-gk ${lockedClass}" value="${w_gk}" min="0" max="100" ${readonlyAttr}>%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-gk ${lockedClass}" value="${w_gk}" min="0" max="100" tabindex="-1" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td>
             <div class="grade-cell">
                 <input type="text" class="sub-grade sub-ck" placeholder="Trống" value="${ck}">
-                <div class="weight-input-wrapper"><input type="number" class="w-ck ${lockedClass}" value="${w_ck}" min="0" max="100" ${readonlyAttr}>%</div>
+                <div class="weight-input-wrapper"><input type="number" class="w-ck ${lockedClass}" value="${w_ck}" min="0" max="100" tabindex="-1" ${readonlyAttr}>%</div>
             </div>
         </td>
         <td class="final-grade">-</td>
         <td><input type="number" class="sub-expected" min="0" max="10" step="0.1" placeholder="Mục tiêu" value="${expected}"></td>
-        <td><button class="btn-delete-icon" onclick="deleteRow(this)" title="Xóa môn này"><i class="fa-solid fa-trash-can"></i></button></td>
+        <td><button class="btn-delete-icon" onclick="deleteRow(this)" tabindex="-1" title="Xóa môn này"><i class="fa-solid fa-trash-can"></i></button></td>
     `;
 }
 
@@ -410,10 +410,12 @@ function calculateSingleRow(row) {
                 item.el.value = ""; 
                 item.el.classList.add("disabled-grade");
                 item.el.placeholder = "🚫";
+                item.el.setAttribute("tabindex", "-1"); 
             } else {
                 item.el.disabled = false;
                 item.el.classList.remove("disabled-grade");
                 if (item.el.placeholder === "🚫") item.el.placeholder = "Trống";
+                item.el.removeAttribute("tabindex");
             }
         }
     });
@@ -680,7 +682,7 @@ function renderDropdownMenu() {
 }
 
 // ==========================================
-// 7. KHỞI CHẠY HỆ THỐNG
+// 7. KHỞI CHẠY HỆ THỐNG VÀ XỬ LÝ SỰ KIỆN PHÍM
 // ==========================================
 document.addEventListener("DOMContentLoaded", function() {
     renderDropdownMenu();
@@ -691,20 +693,17 @@ document.addEventListener("DOMContentLoaded", function() {
         table.addEventListener('input', function(event) {
             if (event.target.tagName === "INPUT") {
                 
-                // --- BẮT ĐẦU: XỬ LÝ NHẬP ĐIỂM CHUYỂN NHANH (VD: 75 -> 7.5) ---
                 if (event.target.classList.contains("sub-grade") || event.target.classList.contains("sub-expected")) {
                     let val = event.target.value.trim();
                     if (val !== "") {
-                        // Nếu gõ số liền mạch không chấm/phẩy (VD: 75, 100) -> Chia 10
                         if (!val.includes('.') && !val.includes(',')) {
                             let num = parseFloat(val);
                             if (!isNaN(num) && num > 10) {
                                 num = num / 10;
-                                if (num > 10) num = 10; // Không cho phép lố điểm 10
+                                if (num > 10) num = 10; 
                                 event.target.value = num;
                             }
                         } else {
-                            // Nếu có dấu phẩy mà lỡ gõ lố điểm (VD: 11.5) -> Ép về 10
                             let num = parseFloat(val.replace(',', '.'));
                             if (!isNaN(num) && num > 10) {
                                 event.target.value = 10;
@@ -712,7 +711,6 @@ document.addEventListener("DOMContentLoaded", function() {
                         }
                     }
                 }
-                // --- KẾT THÚC XỬ LÝ NHẬP ĐIỂM ---
 
                 const row = event.target.closest('tr');
                 if (row) calculateSingleRow(row);
@@ -721,13 +719,43 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
+    // XỬ LÝ SỰ KIỆN NHẤN PHÍM ENTER ĐỂ NHẢY Ô (LỌC CÁC Ô TỶ LỆ)
     document.addEventListener("keydown", function(event) {
         if (event.key === "Enter" && event.target.tagName === "INPUT") {
+            
+            if (event.target.id === "subjectSearch" || event.target.id === "quickEntryInput") {
+                return; 
+            }
+
             event.preventDefault(); 
+            
             const row = event.target.closest('tr');
-            if (row) calculateSingleRow(row);
-            saveData(); 
-            calculateTotalGPA(); 
+            if (row) {
+                calculateSingleRow(row);
+                saveData(); 
+                calculateTotalGPA(); 
+
+                // Lấy các ô nhập chính (BỎ QUA hoàn toàn các ô tỷ lệ % mờ bên dưới)
+                const inputs = Array.from(row.querySelectorAll('input:not(:disabled)')).filter(input => !input.closest('.weight-input-wrapper'));
+                
+                const currentIndex = inputs.indexOf(event.target);
+
+                if (currentIndex > -1 && currentIndex < inputs.length - 1) {
+                    inputs[currentIndex + 1].focus();
+                    inputs[currentIndex + 1].select(); 
+                } else if (currentIndex === inputs.length - 1) {
+                    const nextRow = row.nextElementSibling;
+                    if (nextRow) {
+                        const nextInputs = Array.from(nextRow.querySelectorAll('input:not(:disabled)')).filter(input => !input.closest('.weight-input-wrapper'));
+                        if (nextInputs.length > 0) {
+                            nextInputs[0].focus();
+                            nextInputs[0].select();
+                        }
+                    } else {
+                        event.target.blur();
+                    }
+                }
+            }
         }
     });
 });
