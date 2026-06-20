@@ -97,7 +97,6 @@ function handleQuickEntry(event) {
         let numberStr = "";
         let parsedNums = [];
 
-        // Dùng Regex bóc tách 2 phần: [Tên môn/Mã môn] và [Cụm số điểm ở đuôi]
         const match = rawText.match(/^(.*?)\s+([\d\.\s]+)$/);
         
         if (match) {
@@ -106,13 +105,12 @@ function handleQuickEntry(event) {
             
             if (foundSub) {
                 query = tempQuery;
-                numberStr = match[2].replace(/\s+/g, ''); // Ép các số dính liền vào nhau
-                parsedNums = parseGluedNumbers(numberStr); // Chạy hàm mổ xẻ số
+                numberStr = match[2].replace(/\s+/g, ''); 
+                parsedNums = parseGluedNumbers(numberStr); 
             } else {
                 query = removeVietnameseTones(rawText.toLowerCase());
             }
         } else {
-            // Trường hợp user gõ dính luôn cả chữ và số (VD: CE1184987.5)
             const stickyMatch = rawText.match(/^([a-zA-Z]+\d+)([\d\.]+)$/);
             if (stickyMatch) {
                 let tempQuery = removeVietnameseTones(stickyMatch[1].toLowerCase());
@@ -136,7 +134,6 @@ function handleQuickEntry(event) {
 
         const newSubData = { ...matchedSubject };
 
-        // Đếm xem môn này có bao nhiêu cột tính điểm (bỏ qua cột 0%)
         const activeSlots = [];
         if (newSubData.w_qt > 0) activeSlots.push('qt');
         if (newSubData.w_th > 0) activeSlots.push('th');
@@ -144,19 +141,16 @@ function handleQuickEntry(event) {
         if (newSubData.w_ck > 0) activeSlots.push('ck');
 
         if (parsedNums.length > 0) {
-            // Nếu độ dài mảng số dư 1 so với số cột điểm, 100% số đầu tiên là Tín chỉ
             if (parsedNums.length >= activeSlots.length + 1) {
                 newSubData.credits = parsedNums[0];
-                parsedNums = parsedNums.slice(1); // Cắt bỏ tín chỉ, chừa lại điểm
+                parsedNums = parsedNums.slice(1); 
             }
             
-            // Đổ điểm theo thứ tự vào các ô đang mở
             for (let i = 0; i < parsedNums.length && i < activeSlots.length; i++) {
                 newSubData[activeSlots[i]] = parsedNums[i];
             }
         }
 
-        // Tạo giao diện
         const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
         const newRow = table.insertRow();
         newRow.setAttribute("data-preset", "true");
@@ -166,11 +160,10 @@ function handleQuickEntry(event) {
         saveData();
         calculateTotalGPA();
 
-        inputEl.value = ""; // Xóa trắng thanh nhập sau khi add thành công
+        inputEl.value = ""; 
     }
 }
 
-// Hàm hỗ trợ: Tìm môn học trong PRESET
 function findSubject(query) {
     for (const group of PRESET_DATA) {
         let found = group.subjects.find(sub => {
@@ -183,7 +176,6 @@ function findSubject(query) {
     return null;
 }
 
-// Hàm hỗ trợ: Bóc tách chuỗi số dính liền (VD: "4987.5" -> [4, 9, 8, 7.5])
 function parseGluedNumbers(str) {
     let nums = [];
     let i = 0;
@@ -197,7 +189,6 @@ function parseGluedNumbers(str) {
                 i += 2;
             }
         } else {
-            // Chỉ lấy 1 chữ số thập phân tối đa để khỏi dính chùm
             let m = str.substring(i).match(/^\d(\.\d)?/);
             if (m) {
                 nums.push(parseFloat(m[0]));
@@ -631,10 +622,10 @@ const PRESET_DATA = [
             { code: "SS003", name: "Tư tưởng Hồ Chí Minh", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
             { code: "SS004", name: "Kỹ năng nghề nghiệp", credits: 2, w_qt: 40, w_gk: 0, w_th: 0, w_ck: 60 },
             { code: "SS006", name: "Pháp luật đại cương", credits: 2, w_qt: 0, w_gk: 40, w_th: 0, w_ck: 60 },
-            { code: "SS007", name: "Triết học Mác – Lênin", credits: 3, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
-            { code: "SS008", name: "Kinh tế chính trị Mác – Lênin", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS007", name: "Triết học Mác-Lênin", credits: 3, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
+            { code: "SS008", name: "Kinh tế chính trị Mác-Lênin", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
             { code: "SS009", name: "Chủ nghĩa xã hội khoa học", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 },
-            { code: "SS010", name: "Lịch sử Đảng Cộng sản Việt Nam", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 }
+            { code: "SS010", name: "Lịch sử Đảng", credits: 2, w_qt: 50, w_gk: 0, w_th: 0, w_ck: 50 }
         ]
     }
 ];
@@ -699,6 +690,30 @@ document.addEventListener("DOMContentLoaded", function() {
     if (table) {
         table.addEventListener('input', function(event) {
             if (event.target.tagName === "INPUT") {
+                
+                // --- BẮT ĐẦU: XỬ LÝ NHẬP ĐIỂM CHUYỂN NHANH (VD: 75 -> 7.5) ---
+                if (event.target.classList.contains("sub-grade") || event.target.classList.contains("sub-expected")) {
+                    let val = event.target.value.trim();
+                    if (val !== "") {
+                        // Nếu gõ số liền mạch không chấm/phẩy (VD: 75, 100) -> Chia 10
+                        if (!val.includes('.') && !val.includes(',')) {
+                            let num = parseFloat(val);
+                            if (!isNaN(num) && num > 10) {
+                                num = num / 10;
+                                if (num > 10) num = 10; // Không cho phép lố điểm 10
+                                event.target.value = num;
+                            }
+                        } else {
+                            // Nếu có dấu phẩy mà lỡ gõ lố điểm (VD: 11.5) -> Ép về 10
+                            let num = parseFloat(val.replace(',', '.'));
+                            if (!isNaN(num) && num > 10) {
+                                event.target.value = 10;
+                            }
+                        }
+                    }
+                }
+                // --- KẾT THÚC XỬ LÝ NHẬP ĐIỂM ---
+
                 const row = event.target.closest('tr');
                 if (row) calculateSingleRow(row);
                 saveData(); 
