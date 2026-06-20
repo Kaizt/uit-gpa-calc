@@ -6,6 +6,18 @@ function removeVietnameseTones(str) {
               .replace(/đ/g, 'd').replace(/Đ/g, 'D');
 }
 
+// Hàm quét kiểm tra xem môn học đã có trong bảng chưa
+function isSubjectExists(subjectCode) {
+    if (!subjectCode) return false;
+    const codeInputs = document.querySelectorAll("#subjectTable tbody tr .sub-code");
+    for (let input of codeInputs) {
+        if (input.value.trim().toUpperCase() === subjectCode.trim().toUpperCase()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // ==========================================
 // 1. QUẢN LÝ DROPDOWN & NHẬP NHANH (QUICK ENTRY)
 // ==========================================
@@ -59,6 +71,12 @@ function filterSubjects() {
                 
                 a.onclick = function(e) {
                     e.preventDefault(); 
+                    
+                    if (isSubjectExists(data.code)) {
+                        alert(`⚠️ Môn học "${data.code} - ${data.name}" đã tồn tại trong bảng điểm!`);
+                        return;
+                    }
+
                     const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
                     const newRow = table.insertRow();
                     newRow.setAttribute("data-preset", "true");
@@ -129,6 +147,11 @@ function handleQuickEntry(event) {
 
         if (!matchedSubject) {
             alert(`❌ Không tìm thấy môn học nào khớp với: "${rawText}"\nVui lòng kiểm tra lại mã hoặc tên môn.`);
+            return;
+        }
+
+        if (isSubjectExists(matchedSubject.code)) {
+            alert(`⚠️ Môn học "${matchedSubject.code} - ${matchedSubject.name}" đã tồn tại trong bảng điểm!`);
             return;
         }
 
@@ -287,7 +310,7 @@ function createRowHTML(data = {}, isPreset = false) {
     const w_gk = data.w_gk !== undefined ? data.w_gk : "20";
     const w_ck = data.w_ck !== undefined ? data.w_ck : "60";
 
-    const readonlyAttr = isPreset ? 'readonly title="Tỷ lệ chuẩn (Không thể sửa)"' : '';
+    const readonlyAttr = isPreset ? 'readonly title="Tỷ lệ chuẩn (Không thể sửa)" tabindex="-1"' : '';
     const lockedClass = isPreset ? 'locked-weight' : '';
 
     return `
@@ -360,12 +383,12 @@ function convertToHệ4(grade10) {
     return 0.0;
 }
 
-function getRank(gpa4) {
-    if (gpa4 >= 3.6) return "Xuất sắc";
-    if (gpa4 >= 3.2) return "Giỏi";
-    if (gpa4 >= 2.5) return "Khá";
-    if (gpa4 >= 2.0) return "Trung bình";
-    return "Yếu/Kém";
+// HÀM XẾP LOẠI MỚI DỰA TRÊN THANG ĐIỂM 10
+function getRank(gpa10) {
+    if (gpa10 >= 9.0) return "Xuất sắc";
+    if (gpa10 >= 8.0) return "Giỏi";
+    if (gpa10 >= 5.0) return "Khá";
+    return "Kém";
 }
 
 function calculateSingleRow(row) {
@@ -520,7 +543,9 @@ function calculateTotalGPA() {
 
     const finalGpa10 = (Math.round((rawGpa10 + Number.EPSILON) * 100) / 100).toFixed(2);
     const finalGpa4 = (Math.round((rawGpa4 + Number.EPSILON) * 100) / 100).toFixed(2);
-    const rank = getRank(parseFloat(finalGpa4));
+    
+    // GỌI HÀM XẾP LOẠI BẰNG ĐIỂM HỆ 10 ĐÃ ĐƯỢC CẬP NHẬT
+    const rank = getRank(parseFloat(finalGpa10));
 
     document.getElementById("resTotalCredits").innerText = totalCredits;
     document.getElementById("resGpa10").innerText = finalGpa10;
@@ -663,6 +688,12 @@ function renderDropdownMenu() {
             
             subLink.onclick = function(e) {
                 e.preventDefault(); 
+                
+                if (isSubjectExists(data.code)) {
+                    alert(`⚠️ Môn học "${data.code} - ${data.name}" đã tồn tại trong bảng điểm!`);
+                    return;
+                }
+
                 const table = document.getElementById("subjectTable").getElementsByTagName('tbody')[0];
                 const newRow = table.insertRow();
                 newRow.setAttribute("data-preset", "true");
@@ -719,7 +750,6 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // XỬ LÝ SỰ KIỆN NHẤN PHÍM ENTER ĐỂ NHẢY Ô (LỌC CÁC Ô TỶ LỆ)
     document.addEventListener("keydown", function(event) {
         if (event.key === "Enter" && event.target.tagName === "INPUT") {
             
@@ -735,7 +765,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 saveData(); 
                 calculateTotalGPA(); 
 
-                // Lấy các ô nhập chính (BỎ QUA hoàn toàn các ô tỷ lệ % mờ bên dưới)
                 const inputs = Array.from(row.querySelectorAll('input:not(:disabled)')).filter(input => !input.closest('.weight-input-wrapper'));
                 
                 const currentIndex = inputs.indexOf(event.target);
